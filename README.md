@@ -13,7 +13,7 @@ Speech Processing course project: predicting spoken command intent from audio us
 | 0 | Load, frame, window | `notebooks/stage0_load_frame_window.ipynb` |
 | 1 | Short-Time Energy, Zero-Crossing Rate, Voiced/Unvoiced/Silence | `notebooks/stage1_ste_zcr.ipynb` |
 | 2 | Pitch (F0) via autocorrelation | `notebooks/stage2_pitch_autocorrelation.ipynb` |
-| 3 | STFT / spectrogram | pending |
+| 3 | STFT / spectrogram | `notebooks/stage3_stft_spectrogram.ipynb` |
 | 4 | Linear Prediction (LPC) | pending |
 | 5 | Feature vector + classifier | pending |
 
