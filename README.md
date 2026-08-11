@@ -16,6 +16,7 @@ Speech Processing course project: predicting spoken command intent from audio us
 | 3 | STFT / spectrogram | `notebooks/stage3_stft_spectrogram.ipynb` |
 | 4 | Linear Prediction (LPC) | `notebooks/stage4_lpc.ipynb` |
 | 5 | Feature vector + classifier | `notebooks/stage5_feature_classifier.ipynb` |
+| 6 | MFCC features | `notebooks/stage6_mfcc_features.ipynb` |
 
 Each notebook is self-contained and executed, with plots and a Results section documenting the observed output.
 
