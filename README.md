@@ -15,7 +15,7 @@ Speech Processing course project: predicting spoken command intent from audio us
 | 2 | Pitch (F0) via autocorrelation | `notebooks/stage2_pitch_autocorrelation.ipynb` |
 | 3 | STFT / spectrogram | `notebooks/stage3_stft_spectrogram.ipynb` |
 | 4 | Linear Prediction (LPC) | `notebooks/stage4_lpc.ipynb` |
-| 5 | Feature vector + classifier | pending |
+| 5 | Feature vector + classifier | `notebooks/stage5_feature_classifier.ipynb` |
 
 Each notebook is self-contained and executed, with plots and a Results section documenting the observed output.
 
