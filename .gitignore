@@ -1,0 +1,20 @@
+venv/
+wavs/
+features_cache.csv
+features_cache_mfcc.csv
+mfcc_sequences.npz
+cnn_cv_results.csv
+multihead_cv_results.csv
+hmm_cv_results.csv
+dtw_baseline_result.csv
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+CLAUDE.md
+.claude
+NOTES.md
+lit_review.md
+PPT_format_22AIE450.pptx
+Speech Processing mid-term project review.pdf
+diagrams/
