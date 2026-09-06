@@ -1,6 +1,6 @@
 # speech-to-action
 
-Speech Processing course project: predicting spoken command intent from audio. The core pipeline (Stages 0-5) uses only classical speech-processing features (energy, zero-crossing rate, pitch, spectrogram, linear prediction) with no pretrained end-to-end speech model (no Whisper/wav2vec2/SLU black boxes) — the classifier never sees raw audio, only hand-built features. Later stages extend this with MFCCs, a from-scratch-trained sequence model, and classical/deep sequence-modeling comparisons, per faculty guidance (see `CLAUDE.md`).
+Speech Processing course project: predicting spoken command intent from audio. The core pipeline (Stages 0-5) uses only classical speech-processing features (energy, zero-crossing rate, pitch, spectrogram, linear prediction) with no pretrained end-to-end speech model (no Whisper/wav2vec2/SLU black boxes) — the classifier never sees raw audio, only hand-built features. Later stages extend this with MFCCs, a from-scratch-trained sequence model, classical/deep sequence-modeling comparisons, and a pretrained-embedding comparison.
 
 ## Dataset
 
@@ -20,8 +20,6 @@ Speech Processing course project: predicting spoken command intent from audio. T
 | 7 | 1D-CNN over MFCC sequences (temporal order) | `notebooks/stage7_cnn_mfcc_sequence.ipynb` |
 | 8 | Multi-head sequence model + DTW/HMM classical baselines | `notebooks/stage8_multihead_and_baselines.ipynb` |
 | 9 | Pretrained-embedding comparison (wav2vec2, mean-pooled + full-sequence CNN) | `notebooks/stage9_pretrained_embedding_comparison.ipynb` |
-
-Pipeline complete at Stage 9. A planned Stage 10 ("final ablation ladder / write-up support") was dropped as redundant: the ablation study, pretrained-model comparison, and reduced/per-slot class task requested by faculty are all already satisfied by Stages 5b, 9, and 8 respectively, and the Stage 5→9 accuracy progression (16.5% → 25.8% → 72.5% → 77.3% → 93.1%) already serves as the ablation narrative across the Stage 8/9 notebooks and `NOTES.md`.
 
 Each notebook is self-contained and executed, with plots and a Results section documenting the observed output. Stages 7-9 use `scripts/extract_*.py` and `scripts/run_*_cv.py` / `scripts/run_*_baseline.py` for full-dataset feature extraction and cross-validated training, since these are too slow (minutes to tens of minutes) to run inline in a notebook cell — the notebooks load cached results.
 
