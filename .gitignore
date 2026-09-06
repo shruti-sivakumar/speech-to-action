@@ -1,3 +1,4 @@
+.gitignore
 venv/
 wavs/
 features_cache.csv
