@@ -19,10 +19,12 @@ Speech Processing course project: predicting spoken command intent from audio. T
 | 6 | MFCC features | `notebooks/stage6_mfcc_features.ipynb` |
 | 7 | 1D-CNN over MFCC sequences (temporal order) | `notebooks/stage7_cnn_mfcc_sequence.ipynb` |
 | 8 | Multi-head sequence model + DTW/HMM classical baselines | `notebooks/stage8_multihead_and_baselines.ipynb` |
-| 9 | Pretrained-embedding comparison (wav2vec2) | `notebooks/stage9_pretrained_embedding_comparison.ipynb` |
+| 9 | Pretrained-embedding comparison (wav2vec2, mean-pooled + full-sequence CNN) | `notebooks/stage9_pretrained_embedding_comparison.ipynb` |
 | 10 | Final ablation ladder / write-up support | pending |
 
-Each notebook is self-contained and executed, with plots and a Results section documenting the observed output. Stages 7-8 use `scripts/extract_mfcc_sequences.py` and `scripts/run_*_cv.py` / `scripts/run_*_baseline.py` for full-dataset feature extraction and cross-validated training, since these are too slow (minutes to tens of minutes) to run inline in a notebook cell — the notebooks load cached results.
+Each notebook is self-contained and executed, with plots and a Results section documenting the observed output. Stages 7-9 use `scripts/extract_*.py` and `scripts/run_*_cv.py` / `scripts/run_*_baseline.py` for full-dataset feature extraction and cross-validated training, since these are too slow (minutes to tens of minutes) to run inline in a notebook cell — the notebooks load cached results.
+
+**Headline result:** a frozen wav2vec2-base representation, fed as a full per-frame sequence into a Stage 7-style 1D-CNN (encoder never fine-tuned), reaches **93.1% ± 3.1%** mean held-out accuracy under 5-fold speaker-grouped cross-validation — the best result in the project, ahead of Stage 8's classical-feature multi-head CNN (77.3%) and close to the ~96.6% published fine-tuned end-to-end benchmark for this task. See Stage 9's notebook for the full progression, including the intermediate mean-pooled result that isolated *why* (temporal order, not representation quality, was the missing piece).
 
 ## Environment
 
