@@ -8,6 +8,8 @@ cnn_cv_results.csv
 multihead_cv_results.csv
 hmm_cv_results.csv
 dtw_baseline_result.csv
+wav2vec2_embeddings.npz
+wav2vec2_cv_results.csv
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
