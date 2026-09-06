@@ -19,14 +19,14 @@ Speech Processing course project: predicting spoken command intent from audio. T
 | 6 | MFCC features | `notebooks/stage6_mfcc_features.ipynb` |
 | 7 | 1D-CNN over MFCC sequences (temporal order) | `notebooks/stage7_cnn_mfcc_sequence.ipynb` |
 | 8 | Multi-head sequence model + DTW/HMM classical baselines | `notebooks/stage8_multihead_and_baselines.ipynb` |
-| 9 | Pretrained-embedding comparison | pending |
+| 9 | Pretrained-embedding comparison (wav2vec2) | `notebooks/stage9_pretrained_embedding_comparison.ipynb` |
 | 10 | Final ablation ladder / write-up support | pending |
 
 Each notebook is self-contained and executed, with plots and a Results section documenting the observed output. Stages 7-8 use `scripts/extract_mfcc_sequences.py` and `scripts/run_*_cv.py` / `scripts/run_*_baseline.py` for full-dataset feature extraction and cross-validated training, since these are too slow (minutes to tens of minutes) to run inline in a notebook cell — the notebooks load cached results.
 
 ## Environment
 
-Python 3, virtual environment (`venv/`). Libraries: `numpy`, `scipy`, `matplotlib`, `librosa`, `scikit-learn`, `pandas`, `jupyter`, `tensorflow` (Stage 7-8 sequence models), `hmmlearn`, `fastdtw` (Stage 8 classical baselines). No GPU used or required.
+Python 3, virtual environment (`venv/`). Libraries: `numpy`, `scipy`, `matplotlib`, `librosa`, `scikit-learn`, `pandas`, `jupyter`, `tensorflow` (Stage 7-8 sequence models), `hmmlearn`, `fastdtw` (Stage 8 classical baselines), `torch`, `transformers` (Stage 9 frozen wav2vec2 embeddings). No GPU used or required — Stage 9 uses wav2vec2-base only as a frozen feature extractor (no fine-tuning), which is CPU-feasible.
 
 ## Methodology notes (Stage 7 onward)
 
