@@ -1,6 +1,6 @@
 # speech-to-action
 
-Speech Processing course project: predicting spoken command intent from audio. The core pipeline (Stages 0-5) uses only classical speech-processing features (energy, zero-crossing rate, pitch, spectrogram, linear prediction) with no pretrained end-to-end speech model (no Whisper/wav2vec2/SLU black boxes) — the classifier never sees raw audio, only hand-built features. Later stages extend this with MFCCs, a from-scratch-trained sequence model, classical/deep sequence-modeling comparisons, and a pretrained-embedding comparison.
+Speech Processing course project: predicting spoken command intent from audio. The core pipeline (Stages 0-5) uses only classical speech-processing features (energy, zero-crossing rate, pitch, spectrogram, linear prediction) with no pretrained end-to-end speech model (no Whisper/wav2vec2/SLU black boxes) — the classifier never sees raw audio, only hand-built features. Later stages extend this with MFCCs, a from-scratch-trained sequence model, classical/deep sequence-modeling comparisons, a pretrained-embedding comparison, and an ablation isolating the effect of MFCC's decorrelation step on a CNN.
 
 ## Dataset
 
@@ -20,14 +20,17 @@ Speech Processing course project: predicting spoken command intent from audio. T
 | 7 | 1D-CNN over MFCC sequences (temporal order) | `notebooks/stage7_cnn_mfcc_sequence.ipynb` |
 | 8 | Multi-head sequence model + DTW/HMM classical baselines | `notebooks/stage8_multihead_and_baselines.ipynb` |
 | 9 | Pretrained-embedding comparison (wav2vec2, mean-pooled + full-sequence CNN) | `notebooks/stage9_pretrained_embedding_comparison.ipynb` |
+| 10 | CNN without MFCC: ablation on log-mel spectrogram sequences | `notebooks/stage10_cnn_logmel_no_mfcc.ipynb` |
 
 Each notebook is self-contained and executed, with plots and a Results section documenting the observed output. Stages 7-9 use `scripts/extract_*.py` and `scripts/run_*_cv.py` / `scripts/run_*_baseline.py` for full-dataset feature extraction and cross-validated training, since these are too slow (minutes to tens of minutes) to run inline in a notebook cell — the notebooks load cached results.
 
 **Headline result:** a frozen wav2vec2-base representation, fed as a full per-frame sequence into a Stage 7-style 1D-CNN (encoder never fine-tuned), reaches **93.1% ± 3.1%** mean held-out accuracy under 5-fold speaker-grouped cross-validation — the best result in the project, ahead of Stage 8's classical-feature multi-head CNN (77.3%) and close to the ~96.6% published fine-tuned end-to-end benchmark for this task. See Stage 9's notebook for the full progression, including the intermediate mean-pooled result that isolated *why* (temporal order, not representation quality, was the missing piece).
 
+**Stage 10 finding:** with the CNN architecture and cross-validation protocol held identical to Stage 7, swapping the MFCC front end for a 40-band log-mel spectrogram (i.e. dropping only MFCC's final DCT/decorrelation step) *improved* accuracy from 72.5% ± 5.0% to **79.4% ± 6.8%**, ahead of even Stage 8's multi-head architecture (77.3%). MFCC's cepstral decorrelation, useful for classical GMM-style classifiers, was not necessary for this CNN and mildly hurt it — see Stage 10's notebook for the disclosed confound (log-mel's 40 bands vs. MFCC's 13 truncated coefficients) that keeps this from being a byte-for-byte isolation of the DCT step alone.
+
 ## Environment
 
-Python 3, virtual environment (`venv/`). Libraries: `numpy`, `scipy`, `matplotlib`, `librosa`, `scikit-learn`, `pandas`, `jupyter`, `tensorflow` (Stage 7-8 sequence models), `hmmlearn`, `fastdtw` (Stage 8 classical baselines), `torch`, `transformers` (Stage 9 frozen wav2vec2 embeddings). No GPU used or required — Stage 9 uses wav2vec2-base only as a frozen feature extractor (no fine-tuning), which is CPU-feasible.
+Python 3, virtual environment (`venv/`). Libraries: `numpy`, `scipy`, `matplotlib`, `librosa`, `scikit-learn`, `pandas`, `jupyter`, `tensorflow` (Stage 7-8, 10 sequence models), `hmmlearn`, `fastdtw` (Stage 8 classical baselines), `torch`, `transformers` (Stage 9 frozen wav2vec2 embeddings). No GPU used or required — Stage 9 uses wav2vec2-base only as a frozen feature extractor (no fine-tuning), which is CPU-feasible.
 
 ## Methodology notes (Stage 7 onward)
 

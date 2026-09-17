@@ -13,6 +13,8 @@ wav2vec2_cv_results.csv
 wav2vec2_pca.joblib
 wav2vec2_sequences.npz
 wav2vec2_seq_cv_results.csv
+logmel_sequences.npz
+cnn_logmel_cv_results.csv
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
