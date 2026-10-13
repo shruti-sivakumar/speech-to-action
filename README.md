@@ -37,8 +37,8 @@ The study is organised in four tiers that share one input, one label set and one
 | 2 | DTW 3-NN, MFCC (155-query subset of one fold) | 11.6 |
 | 2 | Gaussian HMM, MFCC | 6.0 ± 0.7 |
 | 3 | 1D-CNN, MFCC | 72.5 ± 5.0 |
-| 3 | Multi-head 1D-CNN, MFCC (+ SpecAugment) | 77.3 ± 6.7 |
 | 3 | 1D-CNN, log-mel | 79.4 ± 6.8 |
+| 3 | Multi-head 1D-CNN, MFCC (+ SpecAugment) | 77.3 ± 6.7 |
 | 4 | wav2vec 2.0 mean-pooled + MLP | 69.9 ± 4.7 |
 | 4 | **wav2vec 2.0 frame sequence + 1D-CNN** | **93.1 ± 3.1** |
 

@@ -266,8 +266,8 @@ rows = [
     ("Gaussian HMM (MFCC)", 100 * R["hmm"].mean(), 100 * R["hmm"].std(ddof=1), "Sequence (classical)"),
     ("DTW 3-NN (MFCC)$^{\\dagger}$", 11.6, None, "Sequence (classical)"),
     ("1D-CNN (MFCC)", 100 * R["cnn_mfcc"].mean(), 100 * R["cnn_mfcc"].std(ddof=1), "Sequence CNN (from scratch)"),
-    ("Multi-head 1D-CNN (MFCC)", 100 * R["mh_cnn"].mean(), 100 * R["mh_cnn"].std(ddof=1), "Sequence CNN (from scratch)"),
     ("1D-CNN (log-mel)", 100 * R["cnn_logmel"].mean(), 100 * R["cnn_logmel"].std(ddof=1), "Sequence CNN (from scratch)"),
+    ("Multi-head 1D-CNN (MFCC)", 100 * R["mh_cnn"].mean(), 100 * R["mh_cnn"].std(ddof=1), "Sequence CNN (from scratch)"),
     ("wav2vec 2.0 mean-pool + SVM", 100 * R["w2v_svm"].mean(), 100 * R["w2v_svm"].std(ddof=1), "Self-supervised (frozen)"),
     ("wav2vec 2.0 mean-pool + MLP", 100 * R["w2v_mlp"].mean(), 100 * R["w2v_mlp"].std(ddof=1), "Self-supervised (frozen)"),
     ("wav2vec 2.0 sequence + 1D-CNN", 100 * R["w2v_seq"].mean(), 100 * R["w2v_seq"].std(ddof=1), "Self-supervised (frozen)"),
@@ -288,7 +288,7 @@ fig.tight_layout(); save(fig, "fig_overall")
 
 # Per-fold accuracies (speaker-grouped CV models)
 cvrows = [("Gaussian HMM\n(MFCC)", "hmm", ORANGE), ("1D-CNN\n(MFCC)", "cnn_mfcc", AQUA),
-          ("Multi-head CNN\n(MFCC)", "mh_cnn", AQUA), ("1D-CNN\n(log-mel)", "cnn_logmel", AQUA),
+          ("1D-CNN\n(log-mel)", "cnn_logmel", AQUA), ("Multi-head CNN\n(MFCC)", "mh_cnn", AQUA),
           ("wav2vec 2.0\npool + SVM", "w2v_svm", YELLOW), ("wav2vec 2.0\npool + MLP", "w2v_mlp", YELLOW),
           ("wav2vec 2.0\nseq. + CNN", "w2v_seq", YELLOW)]
 fig, ax = plt.subplots(figsize=(7.0, 2.4))

@@ -189,7 +189,7 @@ Each utterance is summarised by ten prosodic statistics: the mean and standard d
 MFCC sequences are padded or truncated to 350 frames (the 95th percentile of duration) for storage, and the padding is removed before sequence modelling so that each model sees the true utterance length. For DTW~\cite{sakoe1978dtw}, an approximate multiscale DTW with Euclidean local distance compares each query with five randomly drawn templates per intent (155 in total), and the label is assigned by a 3-nearest-neighbour vote. Because each comparison is costly, DTW is evaluated on 155 queries (five per intent) drawn from the held-out speakers of the first cross-validation fold. For the HMM~\cite{rabiner1989hmm}, one three-state Gaussian HMM with diagonal covariances is trained per intent with 20 Baum--Welch iterations, and a query is assigned to the intent whose model gives the highest log-likelihood.
 
 \subsection{Tier 3: convolutional sequence models}
-The convolutional network of Fig.~\ref{fig:cnn} operates along the time axis and treats feature dimensions as channels. It is trained from random initialisation with Adam~\cite{kingma2014adam}, sparse categorical cross-entropy, a batch size of 128 and at most 50 epochs, with early stopping (patience 8) on a validation group of speakers. Inputs are standardised per channel with training-fold statistics. Three variants are trained: (i) a single 31-way head on 13-dimensional MFCC sequences (115,871 parameters); (ii) a multi-head variant whose shared trunk feeds three softmax layers for action, object and location, trained with the sum of the three losses and with SpecAugment-style masking~\cite{park2019specaugment} of two 20-frame time blocks and two 3-coefficient blocks per sequence; and (iii) a single-head network on 40-band log-mel sequences computed with the same framing, which differ from MFCC only in omitting the DCT and the truncation that follows it. To separate these two operations, the orthonormal DCT-II is applied to the same 40-band log-mel frames and either all 40 coefficients (an invertible transform) or only the first 13 are retained. A multi-head prediction is counted as correct only when all three slots are correct.
+The convolutional network of Fig.~\ref{fig:cnn} operates along the time axis and treats feature dimensions as channels. It is trained from random initialisation with Adam~\cite{kingma2014adam}, sparse categorical cross-entropy, a batch size of 128 and at most 50 epochs, with early stopping (patience 8) on a validation group of speakers. Inputs are standardised per channel with training-fold statistics. The input representation is varied first and the output structure second. (i) A single 31-way head is trained on 13-dimensional MFCC sequences (115,871 parameters). (ii) The same network is trained on 40-band log-mel sequences computed with the same framing, which differ from MFCC only in omitting the DCT and the truncation that follows it. (iii) To separate these two operations, the orthonormal DCT-II is applied to the same 40-band log-mel frames and either all 40 coefficients (an invertible transform) or only the first 13 are retained. (iv) Finally, the output is factorised: a multi-head variant on MFCC input feeds a shared trunk into three softmax layers for action, object and location, trained with the sum of the three losses and with SpecAugment-style masking~\cite{park2019specaugment} of two 20-frame time blocks and two 3-coefficient blocks per sequence. A multi-head prediction is counted as correct only when all three slots are correct.
 
 \begin{figure*}[t]
 \centering
@@ -273,16 +273,10 @@ Adding MFCC statistics raises the SVM to 25.8\% (+9.3 points) and the MLP to 21.
 \subsection{Tier 2: classical sequence models}
 The DTW 3-NN classifier reaches 11.6\% on its 155-query subset, and the per-class Gaussian HMM reaches $6.0 \pm 0.7\%$ over the five folds, both near or below the majority baseline. When the HMMs were trained and scored on the zero-padded sequences, accuracy was $9.8\%$; the drop after padding removal shows that the padded version partly exploited the amount of padding, a duration cue correlated with intent, rather than spectral structure. Inspection of the trimmed scores showed finite, well-separated log-likelihoods, with a small number of class models winning a disproportionate share of queries. These baselines are deliberately minimal (three ergodic states, one Gaussian per state, no dynamic features and five DTW templates per class), and the comparison should be read as showing that such configurations are far from adequate for 31 multi-word intents with 248 phrasings, not that classical sequence modelling is inherently unsuited to the task.
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.80\textwidth]{fig_overall.pdf}\\[2pt]
-\includegraphics[width=0.80\textwidth]{fig_folds.pdf}
-\caption{Top: intent accuracy of all configurations under 5-fold speaker-grouped cross-validation, ordered from classical to modern; error bars denote the standard deviation over folds ($^{\dagger}$DTW is evaluated on a 155-query subset of one fold). Bottom: held-out accuracy of each model per fold, with horizontal bars at the fold mean.}
-\label{fig:overall}
-\end{figure*}
+
 
 \subsection{Tier 3: convolutional sequence models}
-Table~\ref{tab:cv} and Fig.~\ref{fig:overall} summarise the cross-validated sequence models. The single-head CNN on MFCC sequences reaches $72.5 \pm 5.0\%$, almost three times the static MFCC result, which identifies temporal order as the dominant missing factor in Tier~1. The multi-head variant improves on it in every fold (mean paired difference 4.8 points, $p = 0.007$) and reaches $77.3 \pm 6.7\%$. Its per-slot accuracies are $85.3\%$ (action), $91.7\%$ (object) and $94.1\%$ (location) (Fig.~\ref{fig:slots}); the action slot is the weakest. Since this variant also introduces SpecAugment masking, the gain reflects the combination of the factorised output and augmentation.
+Table~\ref{tab:cv} summarises the cross-validated models, grouped by tier. The single-head CNN on MFCC sequences reaches $72.5 \pm 5.0\%$, three times the static MFCC result of Tier~1 on the same folds, which identifies temporal order as the dominant missing factor in Tier~1.
 
 \begin{table}[t]
 \caption{Speaker-grouped five-fold cross-validation (full-intent accuracy, \%)}
@@ -293,10 +287,14 @@ Table~\ref{tab:cv} and Fig.~\ref{fig:overall} summarise the cross-validated sequ
 \toprule
 Model & Mean $\pm$ s.d. & Range\\
 \midrule
+Prosodic + MFCC statistics + SVM (Tier 1) & $24.0 \pm 1.0$ & 22.7--25.2\\
+\midrule
 Gaussian HMM, MFCC & $6.0 \pm 0.7$ & 5.3--7.1\\
+\midrule
 1D-CNN, MFCC & $72.5 \pm 5.0$ & 65.4--77.6\\
-Multi-head 1D-CNN, MFCC & $77.3 \pm 6.7$ & 67.6--83.3\\
 1D-CNN, log-mel & $79.4 \pm 6.8$ & 70.9--88.5\\
+Multi-head 1D-CNN, MFCC & $77.3 \pm 6.7$ & 67.6--83.3\\
+\midrule
 wav2vec 2.0 pooled + SVM & $59.9 \pm 4.4$ & 55.8--67.5\\
 wav2vec 2.0 pooled + MLP & $69.9 \pm 4.7$ & 66.3--78.0\\
 wav2vec 2.0 sequence + 1D-CNN & $\mathbf{93.1 \pm 3.1}$ & 88.9--96.9\\
@@ -306,12 +304,7 @@ wav2vec 2.0 sequence + 1D-CNN & $\mathbf{93.1 \pm 3.1}$ & 88.9--96.9\\
 
 
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.85\columnwidth]{fig_multihead_slots.pdf}
-\caption{Per-slot and full-intent accuracy of the multi-head CNN (mean $\pm$ s.d. over folds; number of classes in parentheses).}
-\label{fig:slots}
-\end{figure}
+
 
 Replacing MFCC with 40-band log-mel input under the identical single-head network raises accuracy to $79.4 \pm 6.8\%$, an improvement in every fold (mean 6.9 points, $p = 0.005$). The two representations share the mel filter bank and the logarithm; MFCC adds a DCT and truncation to 13 coefficients, and the log-mel input is also wider (40 against 13 dimensions). Table~\ref{tab:dct} separates these factors by applying the DCT to the same log-mel frames. Retaining all 40 DCT coefficients, which preserves every dimension and is exactly invertible, lowers accuracy to $63.5 \pm 5.0\%$, 15.9 points below log-mel in every fold ($p < 0.001$). Truncating the same transform to 13 coefficients recovers $73.1 \pm 5.8\%$, which is indistinguishable from the original MFCC computed from 128 mel bands ($p = 0.60$). The advantage of log-mel input is therefore due to the absence of the DCT, not to its additional dimensions, and the size of the mel filter bank has no measurable effect.
 
@@ -332,7 +325,16 @@ DCT of log-mel, all 40 coefficients & 40 & $63.5 \pm 5.0$\\
 \end{tabular}
 \end{table}
 
-Since an invertible linear map could in principle be absorbed by the first convolutional layer, the loss must arise from how the transformed input is presented to the network. Each input channel is standardised to unit variance before training. Across the log-mel bands the standard deviations differ by a factor of 1.9, whereas across the DCT coefficients they differ by a factor of 60, and coefficients 14--40 carry only 2.2\% of the total variance. Standardisation thus gives these low-variance, high-quefrency coefficients, which mainly describe fine spectral detail and noise, the same weight as the coefficients that describe the spectral envelope. Truncation removes most of them, which explains why 13 coefficients outperform 40. The DCT remains appropriate for diagonal-covariance Gaussian models, which benefit from decorrelated inputs, but for this convolutional classifier the log-mel representation is preferable, in agreement with Mohamed \emph{et al.}~\cite{mohamed2012understanding}. The log-mel network also exceeds the multi-head MFCC network by 2.1 points on average, but this difference is not consistent across folds ($p = 0.16$).
+Since an invertible linear map could in principle be absorbed by the first convolutional layer, the loss must arise from how the transformed input is presented to the network. Each input channel is standardised to unit variance before training. Across the log-mel bands the standard deviations differ by a factor of 1.9, whereas across the DCT coefficients they differ by a factor of 60, and coefficients 14--40 carry only 2.2\% of the total variance. Standardisation thus gives these low-variance, high-quefrency coefficients, which mainly describe fine spectral detail and noise, the same weight as the coefficients that describe the spectral envelope. Truncation removes most of them, which explains why 13 coefficients outperform 40. The DCT remains appropriate for diagonal-covariance Gaussian models, which benefit from decorrelated inputs, but for this convolutional classifier the log-mel representation is preferable, in agreement with Mohamed \emph{et al.}~\cite{mohamed2012understanding}.
+
+With the input question settled, the output structure is changed. Factorising the MFCC network into action, object and location heads, trained with SpecAugment masking, raises accuracy to $77.3 \pm 6.7\%$, an improvement over the single-head MFCC network in every fold (mean paired difference 4.8 points, $p = 0.007$). Its per-slot accuracies are $85.3\%$ (action), $91.7\%$ (object) and $94.1\%$ (location) (Fig.~\ref{fig:slots}); the action slot is the weakest. Since this variant also introduces augmentation, the gain reflects the combination of the factorised output and SpecAugment. The single-head log-mel network and the multi-head MFCC network do not differ consistently (2.1 points in favour of log-mel, 4 of 5 folds, $p = 0.16$), so the two modifications are of comparable benefit; their combination was not examined.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\columnwidth]{fig_multihead_slots.pdf}
+\caption{Per-slot and full-intent accuracy of the multi-head CNN (mean $\pm$ s.d. over folds; number of classes in parentheses).}
+\label{fig:slots}
+\end{figure}
 
 
 
@@ -340,6 +342,17 @@ Since an invertible linear map could in principle be absorbed by the first convo
 With mean pooling, the frozen wav2vec~2.0 representation gives $59.9 \pm 4.4\%$ with the SVM and $69.9 \pm 4.7\%$ with the MLP. These figures are far above the static MFCC statistics of Tier~1, yet the pooled MLP does not differ significantly from the from-scratch MFCC CNN (mean paired difference $-2.6$ points, $p = 0.24$). The pooled setting discards temporal order in the same way as the Tier~1 statistics. When the frame sequence is retained and classified by the network of Fig.~\ref{fig:cnn}, accuracy rises to $93.1 \pm 3.1\%$, exceeding the log-mel CNN in every fold (mean paired difference 13.7 points, $p = 0.001$) and showing the lowest fold-to-fold spread of all models. The pooled and sequence results therefore separate two effects: the pre-trained representation is the stronger feature when temporal modelling is held constant, and temporal modelling remains necessary to exploit it.
 
 The cross-validated accuracy of the frozen encoder is close to the 92.35\% reported by SUPERB for frozen wav2vec~2.0 Base on the official test split~\cite{yang2021superb}, although the protocols differ. It remains below the 98.8\% of the ASR-pre-trained model of Lugosch \emph{et al.}~\cite{lugosch2019fsc} and the 98.34\% of frozen HuBERT Base~\cite{yang2021superb}. The present configuration uses only the final transformer layer, whose phonetic content is known to be lower than that of intermediate layers~\cite{pasad2021layerwise}, and a PCA projection that discards 6.4\% of the variance; both are likely contributors to this gap.
+
+\subsection{Overall comparison}
+Fig.~\ref{fig:overall} places all 31-class configurations on a common axis in classical-to-modern order. Three steps account for most of the progression: adding cepstral content to utterance statistics (17.8 to 24.0\%), retaining temporal order with a convolutional network (24.0 to 72.5--79.4\%), and replacing hand-crafted frame features with a frozen self-supervised representation (79.4 to 93.1\%). All figures except DTW share the same speaker folds; the DTW figure rests on a 155-query subset of one fold. In addition, the PCA used in Tier~4 was fitted on utterances from the official training speakers, some of whom fall in held-out folds; the projection is unsupervised and generic, so the effect is expected to be small, but it is not strictly fold-internal.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.80\textwidth]{fig_overall.pdf}\\[2pt]
+\includegraphics[width=0.80\textwidth]{fig_folds.pdf}
+\caption{Top: intent accuracy of all configurations under 5-fold speaker-grouped cross-validation, ordered from classical to modern; error bars denote the standard deviation over folds ($^{\dagger}$DTW is evaluated on a 155-query subset of one fold). Bottom: held-out accuracy of each model per fold, with horizontal bars at the fold mean.}
+\label{fig:overall}
+\end{figure*}
 
 \subsection{Reduced-class slot tasks}
 Table~\ref{tab:slots} and Fig.~\ref{fig:slottasks} report the three slot tasks of Section~\ref{sec:slots} alongside the 31-class task, on the same speaker folds. Reducing the number of classes raises accuracy for every model. For the SVM on prosodic and MFCC statistics, accuracy rises from 24.0\% on the intent to 40.7\% on the action, 49.3\% on the object and 64.3\% on the location. These gains, however, largely follow the rise of the majority-class baseline, from 10.0\% to 25.8\%, 31.2\% and 61.2\%. Expressed as the fraction of the majority-class error that a model removes, $(a - a_{\mathrm{maj}})/(100 - a_{\mathrm{maj}})$, the SVM removes 15.6\% of this error on the intent, 20.1\% on the action, 26.3\% on the object and only 8.0\% on the location, where the MLP falls below the baseline (60.5\% against 61.2\%). The location is unspoken in most utterances and, when present, is a single word near the end of the command, a cue that utterance-level averages capture poorly.
@@ -383,8 +396,7 @@ To inspect individual errors, the sequence wav2vec~2.0 model was retrained on th
 \label{fig:cmw}
 \end{figure}
 
-\subsection{Overall comparison}
-Fig.~\ref{fig:overall} places all configurations on a common axis in classical-to-modern order. Three steps account for most of the progression: adding cepstral content to utterance statistics (17.8 to 24.0\%), retaining temporal order with a convolutional network (24.0 to 72.5--79.4\%), and replacing hand-crafted frame features with a frozen self-supervised representation (79.4 to 93.1\%). All figures except DTW share the same speaker folds; the DTW figure rests on a 155-query subset of one fold. In addition, the PCA used in Tier~4 was fitted on utterances from the official training speakers, some of whom fall in held-out folds; the projection is unsupervised and generic, so the effect is expected to be small, but it is not strictly fold-internal.
+
 
 
 

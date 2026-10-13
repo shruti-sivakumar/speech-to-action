@@ -427,21 +427,22 @@ Gaussian HMM, padding removed & $6.0 \pm 0.7$ & 5-fold speaker-grouped CV\\
 \toprule
 Input / model & Dim. & Mean $\pm$ s.d.\\
 \midrule
-MFCC, 1D-CNN & 13 & $72.5 \pm 5.0$\\
-MFCC, multi-head CNN & 13 & $77.3 \pm 6.7$\\
-Log-mel, 1D-CNN & 40 & $\mathbf{79.4 \pm 6.8}$\\
+\multicolumn{3}{@{}l}{\emph{1. Input representation (single head)}}\\
+MFCC & 13 & $72.5 \pm 5.0$\\
+Log-mel & 40 & $\mathbf{79.4 \pm 6.8}$\\
+DCT of log-mel, first 13 & 13 & $73.1 \pm 5.8$\\
+DCT of log-mel, all 40 & 40 & $63.5 \pm 5.0$\\
 \midrule
-\multicolumn{3}{@{}l}{\emph{DCT ablation on the same log-mel frames}}\\
-DCT, all 40 coefficients & 40 & $63.5 \pm 5.0$\\
-DCT, first 13 coefficients & 13 & $73.1 \pm 5.8$\\
+\multicolumn{3}{@{}l}{\emph{2. Output structure (MFCC input)}}\\
+Multi-head + SpecAugment & 13 & $77.3 \pm 6.7$\\
 \bottomrule
 \end{tabular}
 \end{table}
 \small
 \begin{itemize}\setlength{\itemsep}{2pt}
 \item Same MFCC frames, order kept: 24.0 $\rightarrow$ 72.5\%
-\item Full DCT: $-$15.9 points vs.\ log-mel, every fold
-\item Cause: standardisation inflates weak DCT coefficients
+\item Log-mel beats MFCC in every fold (+6.9, $p = 0.005$)
+\item Full DCT: $-$15.9 points (weak coefficients inflated)
 \end{itemize}
 \column{0.40\textwidth}
 \begin{figure}
@@ -451,8 +452,9 @@ DCT, first 13 coefficients & 13 & $73.1 \pm 5.8$\\
 \end{figure}
 \small
 \begin{itemize}
+\item Multi-head: +4.8 over MFCC, every fold
 \item Action is the weakest slot (85.3\%)
-\item Multi-head gain includes SpecAugment
+\item vs.\ log-mel: n.s.\ ($p = 0.16$)
 \end{itemize}
 \end{columns}
 \end{frame}
@@ -503,6 +505,29 @@ End-to-end transformer \cite{radfar2020transformer} & 99.6\\
 \end{frame}
 
 %======================================================================
+\begin{frame}{Results: Overall Comparison}
+\begin{figure}
+\includegraphics[height=4.3cm]{fig_overall.pdf}
+\vspace{-6pt}
+\caption{All configurations under 5-fold speaker CV, classical to modern ($^{\dagger}$155-query subset).}
+\end{figure}
+\vspace{-6pt}
+\small
+\begin{columns}[T]
+\column{0.47\textwidth}
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item Cepstral content: 17.8 $\rightarrow$ 24.0\%
+\item Temporal order: 24.0 $\rightarrow$ 72.5--79.4\%
+\end{itemize}
+\column{0.47\textwidth}
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item Self-supervised frames: 79.4 $\rightarrow$ 93.1\%
+\item All tiers on the same speaker folds
+\end{itemize}
+\end{columns}
+\end{frame}
+
+%======================================================================
 \begin{frame}{Results: Reduced-Class Slot Tasks}
 \begin{figure}
 \includegraphics[height=3.85cm]{fig_slot_tasks.pdf}
@@ -523,29 +548,6 @@ End-to-end transformer \cite{radfar2020transformer} & 99.6\\
 \item Location: MLP below majority (60.5 vs.\ 61.2\%)
 \item CNNs remove 76--95\% of the majority error
 \item Limit is the representation, not the class count
-\end{itemize}
-\end{columns}
-\end{frame}
-
-%======================================================================
-\begin{frame}{Results: Overall Comparison}
-\begin{figure}
-\includegraphics[height=4.3cm]{fig_overall.pdf}
-\vspace{-6pt}
-\caption{All configurations under 5-fold speaker CV, classical to modern ($^{\dagger}$155-query subset).}
-\end{figure}
-\vspace{-6pt}
-\small
-\begin{columns}[T]
-\column{0.47\textwidth}
-\begin{itemize}\setlength{\itemsep}{1pt}
-\item Cepstral content: 17.8 $\rightarrow$ 24.0\%
-\item Temporal order: 24.0 $\rightarrow$ 72.5--79.4\%
-\end{itemize}
-\column{0.47\textwidth}
-\begin{itemize}\setlength{\itemsep}{1pt}
-\item Self-supervised frames: 79.4 $\rightarrow$ 93.1\%
-\item All tiers on the same speaker folds
 \end{itemize}
 \end{columns}
 \end{frame}

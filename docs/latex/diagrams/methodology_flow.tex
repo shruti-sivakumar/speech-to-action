@@ -40,7 +40,7 @@
 \node[box=diagYellow, text width=2.9cm] (d2) at (10.85,\tierD-0.2) {(a) mean-pool, 768-d\\(b) PCA, $175 \times 128$};
 \node[box=diagYellow, text width=2.6cm] (d3) at (14.55,\tierD-0.2) {(a) SVM / MLP\\(b) 1D-CNN};
 % ---------------- output and evaluation ----------------
-\node[io, text width=2.5cm] (out) at (18.45,1.25) {Intent\\(action, object,\\location)\\31 classes};
+\node[io, text width=2.5cm] (out) at (18.45,1.25) {Intent, 31 classes\\or one slot:\\action (6), object (14),\\location (4)};
 \node[box=diagInk, fill=diagGrey, text width=13.8cm, minimum height=0.95cm] (ev) at (11.4,-5.0)
      {Evaluation: fixed speaker-independent split (Tier 1) \,$\vert$\, 5-fold speaker-grouped cross-validation (Tiers 2--4)\\
       full-intent accuracy, per-slot accuracy, confusion and per-speaker analysis};
