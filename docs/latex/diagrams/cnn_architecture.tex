@@ -1,0 +1,18 @@
+% 1D-CNN used for every sequence experiment (Tiers 3 and 4).
+\begin{tikzpicture}[
+  font=\small, >={Latex[length=2mm,width=1.5mm]},
+  layer/.style={draw=diagInk, fill=#1, rounded corners=2pt, line width=0.6pt, align=center,
+                minimum height=1.55cm, text width=2.1cm, inner sep=2pt},
+  arr/.style={->, line width=0.7pt, draw=diagInk},
+]
+\node[layer=diagGrey] (x) at (0,0) {Input\\$T \times C$};
+\node[layer=diagGreen!12] (c1) at (2.65,0) {Conv1D 64\\$k{=}5$, ReLU\\BN, MaxPool 2};
+\node[layer=diagGreen!12] (c2) at (5.30,0) {Conv1D 128\\$k{=}5$, ReLU\\BN, MaxPool 2};
+\node[layer=diagGreen!12] (c3) at (7.95,0) {Conv1D 128\\$k{=}3$, ReLU};
+\node[layer=diagBlue!10] (g) at (10.60,0) {Global\\average\\pooling};
+\node[layer=diagBlue!10] (d) at (13.25,0) {Dense 128\\ReLU\\Dropout 0.3};
+\node[layer=diagGrey, text width=2.2cm] (o) at (15.95,0) {Softmax 31\\\emph{or} heads\\6 / 14 / 4};
+\foreach \p/\q in {x/c1,c1/c2,c2/c3,c3/g,g/d,d/o}{ \draw[arr] (\p) -- (\q); }
+\node[font=\footnotesize, text=diagInk, align=center] at (7.95,-1.25)
+  {$(T,C)$: MFCC $(350,13)$; log-mel $(350,40)$; wav2vec 2.0 PCA $(175,128)$};
+\end{tikzpicture}

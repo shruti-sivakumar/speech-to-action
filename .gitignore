@@ -1,28 +1,32 @@
-.gitignore
+# Environment
 venv/
-wavs/
-features_cache.csv
-features_cache_mfcc.csv
-mfcc_sequences.npz
-cnn_cv_results.csv
-multihead_cv_results.csv
-hmm_cv_results.csv
-dtw_baseline_result.csv
-wav2vec2_embeddings.npz
-wav2vec2_cv_results.csv
-wav2vec2_pca.joblib
-wav2vec2_sequences.npz
-wav2vec2_seq_cv_results.csv
-logmel_sequences.npz
-cnn_logmel_cv_results.csv
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 .DS_Store
+
+# Dataset audio and regenerable feature caches (see README: Reproducing the results)
+data/fluent_speech_commands_dataset/wavs/
+data/fluent_speech_commands_dataset/*.csv
+data/fluent_speech_commands_dataset/*.npz
+data/fluent_speech_commands_dataset/*.joblib
+
+# LaTeX build artefacts
+docs/latex/*.aux
+docs/latex/*.bbl
+docs/latex/*.blg
+docs/latex/*.log
+docs/latex/*.out
+docs/latex/*.nav
+docs/latex/*.snm
+docs/latex/*.toc
+docs/latex/*.pdf
+
+# Personal working files
 CLAUDE.md
 .claude
 NOTES.md
 lit_review.md
 PPT_format_22AIE450.pptx
 Speech Processing mid-term project review.pdf
-diagrams/
+/diagrams/

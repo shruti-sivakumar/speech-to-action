@@ -1,0 +1,54 @@
+% Methodology flow diagram (shared by the report and the slides).
+% Requires: tikz with arrows.meta, positioning, fit, backgrounds.
+\begin{tikzpicture}[
+  font=\small, >={Latex[length=2.2mm,width=1.6mm]},
+  box/.style={draw=#1, fill=white, rounded corners=2pt, line width=0.7pt, align=center,
+              minimum height=1.3cm, inner sep=3pt},
+  io/.style={draw=diagInk, fill=diagGrey, rounded corners=2pt, line width=0.7pt, align=center,
+             minimum height=1.5cm, inner sep=4pt},
+  band/.style={fill=#1!9, draw=#1!55, rounded corners=4pt, line width=0.5pt},
+  tier/.style={font=\small\bfseries, anchor=north west, text=diagInk, inner sep=2pt},
+  arr/.style={->, line width=0.7pt, draw=diagInk},
+]
+% ---------------- tier bands ----------------
+\def\tierA{5.1} \def\tierB{2.55} \def\tierC{0.0} \def\tierD{-2.55}
+\foreach \y/\c/\t in {\tierA/diagBlue/{Tier 1: Classical features, utterance-level statistics},
+                      \tierB/diagOrange/{Tier 2: Classical sequence models},
+                      \tierC/diagGreen/{Tier 3: Convolutional sequence models trained from scratch},
+                      \tierD/diagYellow/{Tier 4: Frozen self-supervised representation}}{
+  \fill[band=\c] (5.05,\y-1.12) rectangle (16.35,\y+1.12);
+  \node[tier] at (5.1,\y+1.1) {\t};
+}
+% ---------------- input and pre-processing ----------------
+\node[io, text width=2.1cm] (in) at (-0.3,\tierB) {Speech utterance\\16 kHz, mono};
+\node[box=diagInk, text width=2.3cm, minimum height=1.5cm] (pre) at (2.75,\tierB)
+     {Framing\\25 ms / 10 ms\\Hamming window};
+% ---------------- Tier 1 ----------------
+\node[box=diagBlue, text width=3.1cm] (a1) at (7.0,\tierA-0.2) {STE, ZCR, V/U/S\\ACF pitch, LPC formants\\13 MFCC};
+\node[box=diagBlue, text width=2.9cm] (a2) at (10.85,\tierA-0.2) {Mean / std\\over frames\\10-d $\rightarrow$ 36-d};
+\node[box=diagBlue, text width=2.6cm] (a3) at (14.55,\tierA-0.2) {SVM (RBF) / MLP};
+% ---------------- Tier 2 ----------------
+\node[box=diagOrange, text width=3.1cm] (b1) at (7.0,\tierB-0.2) {MFCC sequence\\$T \times 13$};
+\node[box=diagOrange, text width=2.9cm] (b2) at (10.85,\tierB-0.2) {Padding removed\\(true length)};
+\node[box=diagOrange, text width=2.6cm] (b3) at (14.55,\tierB-0.2) {DTW 3-NN /\\Gaussian HMM};
+% ---------------- Tier 3 ----------------
+\node[box=diagGreen, text width=3.1cm] (c1) at (7.0,\tierC-0.2) {MFCC $350 \times 13$ or\\log-mel $350 \times 40$};
+\node[box=diagGreen, text width=2.9cm] (c2) at (10.85,\tierC-0.2) {Standardisation\\(+ SpecAugment)};
+\node[box=diagGreen, text width=2.6cm] (c3) at (14.55,\tierC-0.2) {1D-CNN\\single / multi-head};
+% ---------------- Tier 4 ----------------
+\node[box=diagYellow, text width=3.1cm] (d1) at (7.0,\tierD-0.2) {wav2vec 2.0 Base\\(frozen encoder)\\768-d per 20 ms};
+\node[box=diagYellow, text width=2.9cm] (d2) at (10.85,\tierD-0.2) {(a) mean-pool, 768-d\\(b) PCA, $175 \times 128$};
+\node[box=diagYellow, text width=2.6cm] (d3) at (14.55,\tierD-0.2) {(a) SVM / MLP\\(b) 1D-CNN};
+% ---------------- output and evaluation ----------------
+\node[io, text width=2.5cm] (out) at (18.45,1.25) {Intent\\(action, object,\\location)\\31 classes};
+\node[box=diagInk, fill=diagGrey, text width=13.8cm, minimum height=0.95cm] (ev) at (11.4,-5.0)
+     {Evaluation: fixed speaker-independent split (Tier 1) \,$\vert$\, 5-fold speaker-grouped cross-validation (Tiers 2--4)\\
+      full-intent accuracy, per-slot accuracy, confusion and per-speaker analysis};
+% ---------------- arrows ----------------
+\draw[arr] (in) -- (pre);
+\foreach \n in {a1,b1,c1}{ \draw[arr] (pre.east) -- ++(0.45,0) |- (\n.west); }
+\draw[arr] (in.south) |- node[pos=0.75, below, font=\footnotesize\itshape] {raw waveform} (d1.west);
+\foreach \p/\q in {a1/a2,a2/a3,b1/b2,b2/b3,c1/c2,c2/c3,d1/d2,d2/d3}{ \draw[arr] (\p) -- (\q); }
+\foreach \n in {a3,b3,c3,d3}{ \draw[arr] (\n.east) -- ++(0.35,0) |- (out.west); }
+\draw[arr] (out.south) |- (ev.east);
+\end{tikzpicture}

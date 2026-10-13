@@ -1,0 +1,404 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+\usepackage[hyphens]{url}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue!55!black]{hyperref}
+\graphicspath{{figures/}{../../results/figures/}}
+\input{diagrams/colors.tex}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.75}
+\renewcommand{\dblfloatpagefraction}{0.75}
+
+\begin{document}
+
+\title{Speech-to-Action: A Comparative Study of Classical and Deep Learning Approaches for Spoken Intent Classification}
+
+\author{\IEEEauthorblockN{Shruti Sivakumar}
+\IEEEauthorblockA{\textit{Amrita School of Artificial Intelligence} \\
+\textit{Amrita Vishwa Vidyapeetham}\\
+Coimbatore, India \\
+CB.SC.U4AIE23254}
+\and
+\IEEEauthorblockN{Vida Nadheera S}
+\IEEEauthorblockA{\textit{Amrita School of Artificial Intelligence} \\
+\textit{Amrita Vishwa Vidyapeetham}\\
+Coimbatore, India \\
+CB.SC.U4AIE23244}
+\and
+\IEEEauthorblockN{Shreya Sriram}
+\IEEEauthorblockA{\textit{Amrita School of Artificial Intelligence} \\
+\textit{Amrita Vishwa Vidyapeetham}\\
+Coimbatore, India \\
+CB.SC.U4AIE23248}
+}
+
+\maketitle
+
+\begin{abstract}
+Spoken intent classification maps a short voice command directly to a structured action. This work traces how far a progression of speech representations, ordered from short-time acoustic analysis to self-supervised embeddings, carries the task on the Fluent Speech Commands corpus (30,043 utterances, 97 speakers, 31 intents). A classical front end comprising short-time energy, zero-crossing rate, autocorrelation pitch, linear prediction and mel-frequency cepstral coefficients (MFCC) is first verified on individual utterances and then summarised into utterance-level statistics for support vector machine (SVM) and multilayer perceptron classifiers. Dynamic time warping and per-class Gaussian hidden Markov models serve as classical sequence baselines, one-dimensional convolutional networks are trained from scratch on MFCC and log-mel sequences, and a frozen wav2vec~2.0 encoder is evaluated with pooled and frame-sequence classifiers. All models are compared by five-fold speaker-grouped cross-validation, on the 31-class task and on reduced-class tasks for the action, object and location slots. Utterance statistics reach $24.0 \pm 1.0\%$ on the intent and remain close to the majority-class baseline on the slot tasks. A convolutional network on log-mel sequences attains $79.4 \pm 6.8\%$, and an ablation shows that applying the cepstral DCT to the same input lowers this to $63.5\%$ because per-channel standardisation inflates low-variance coefficients. The same network on frozen wav2vec~2.0 frames attains $93.1 \pm 3.1\%$ on the intent and 95.1--97.5\% on the slots. Preserving temporal order contributes more than any change of static feature or any reduction of the label set, and the residual errors of the strongest model concentrate on commands of opposite polarity.
+\end{abstract}
+
+\begin{IEEEkeywords}
+spoken language understanding, intent classification, linear prediction, MFCC, dynamic time warping, hidden Markov model, convolutional neural network, wav2vec 2.0
+\end{IEEEkeywords}
+
+%=====================================================================
+\section{Introduction}
+%=====================================================================
+Voice interfaces for domestic devices accept short imperative commands such as \emph{``turn the kitchen lights off''} or \emph{``make the music louder''}. The device does not require a transcript of such a command; it requires the structured action that the command denotes. Spoken language understanding (SLU) systems have conventionally obtained this action in two stages, an automatic speech recogniser followed by a text classifier, whereas end-to-end SLU models map the acoustic signal to the intent directly~\cite{serdyuk2018e2eslu,lugosch2019fsc}. The Fluent Speech Commands (FSC) corpus~\cite{lugosch2019fsc} was released to support this direct formulation, and the results reported on it are now dominated by models pre-trained on large speech corpora~\cite{lugosch2019fsc,radfar2020transformer,yang2021superb}.
+
+The near-saturated accuracies reported on FSC leave a different question less examined: how much of the task is solved by each successive layer of speech representation, from the short-time measurements that form the basis of classical speech analysis to the contextual embeddings of a self-supervised encoder. Answering this question requires the representation to be varied while the classifier and the evaluation protocol are held fixed wherever possible. The present work constructs such a progression in four tiers. The first uses hand-crafted features summarised over the utterance; the second applies classical sequence models (dynamic time warping and hidden Markov models) to MFCC sequences; the third trains convolutional networks from scratch on MFCC and log-mel sequences; and the fourth places the same convolutional network on top of a frozen wav2vec~2.0 encoder~\cite{baevski2020wav2vec2}.
+
+The contributions of this work are as follows.
+\begin{itemize}
+\item A classical analysis front end (energy, zero-crossing rate, autocorrelation pitch, short-time Fourier analysis and linear prediction) is implemented, cross-checked on a single utterance, and used to quantify the accuracy attainable from prosodic statistics alone on FSC.
+\item A controlled comparison is reported across four representation tiers, including classical sequence baselines and an ablation that separates the decorrelating and truncating effects of the cepstral DCT under an otherwise identical convolutional network.
+\item It is shown that the official FSC partitions are too speaker-sparse for reliable single-split evaluation, and a five-fold speaker-grouped cross-validation protocol is adopted with fold-wise paired comparisons.
+\item Reduced-class tasks defined by the slot structure of the labels (action, object, location) are evaluated alongside the 31-class task, together with an error analysis that relates the residual confusions of the strongest model to the phrasing structure of the corpus and to inter-speaker variability.
+\end{itemize}
+
+Section~\ref{sec:related} reviews related work and Section~\ref{sec:gaps} states the research gaps and objectives. The dataset is described in Section~\ref{sec:data} and the methodology in Section~\ref{sec:method}. Results are discussed in Section~\ref{sec:results}, and Section~\ref{sec:conclusion} concludes the paper.
+
+%=====================================================================
+\section{Related Work}\label{sec:related}
+%=====================================================================
+\subsection{Short-time analysis and classical features}
+Short-time energy and zero-crossing rate were combined by Rabiner and Sambur~\cite{rabiner1975endpoints} to locate the endpoints of isolated utterances, and Atal and Rabiner~\cite{atal1976vus} recast voiced/unvoiced/silence decisions as a statistical pattern classification over several such measurements. Autocorrelation pitch detection, including the restriction of the lag search to avoid octave errors, was analysed by Rabiner~\cite{rabiner1977pitch}; the YIN estimator~\cite{decheveigne2002yin} later reduced these errors through a cumulative mean-normalised difference function. Allen and Rabiner~\cite{allen1977stft} formalised short-time Fourier analysis and synthesis, and Makhoul~\cite{makhoul1975lp} provided the standard account of linear prediction, in which the autocorrelation normal equations are solved by the Levinson--Durbin recursion. Davis and Mermelstein~\cite{davis1980mfcc} introduced mel-frequency cepstral coefficients and showed that they outperform linear-prediction-based parameters for word recognition, while Furui~\cite{furui1986delta} demonstrated the value of time-derivative cepstral features for speaker-independent recognition.
+
+\subsection{Classical sequence modelling}
+Sakoe and Chiba~\cite{sakoe1978dtw} established dynamic time warping (DTW) as a means of aligning utterances of unequal duration against stored templates. Rabiner's tutorial~\cite{rabiner1989hmm} consolidated the hidden Markov model (HMM) as the statistical framework for variable-length speech, with Gaussian emission densities over cepstral frames. Both approaches were developed for isolated-word recognition with limited vocabularies, which is structurally close to command classification.
+
+\subsection{Neural acoustic models and the choice of input feature}
+The adoption of deep networks for acoustic modelling~\cite{hinton2012dnn} changed the role of the front end. Mohamed \emph{et al.}~\cite{mohamed2012understanding} observed that deep belief networks perform better on log mel filter-bank energies than on MFCC, attributing the difference to the discarding of information by the cepstral transform and to the ability of the network to model correlated inputs. Abdel-Hamid \emph{et al.}~\cite{abdelhamid2014cnn} applied convolution along the frequency and time axes of filter-bank inputs, and Sainath and Parada~\cite{sainath2015kws} showed that small convolutional networks are effective for keyword spotting under a limited computational budget. The Speech Commands corpus~\cite{warden2018speechcommands} standardised the evaluation of such short-command recognisers, and SpecAugment~\cite{park2019specaugment} introduced time and frequency masking as a feature-level augmentation. Feature-family comparisons in other speech classification tasks~\cite{devi2021meeteilon,nanmalar2025tamil} likewise report that single hand-crafted families plateau and that cepstral features or feature fusion recover much of the gap.
+
+\subsection{End-to-end SLU and self-supervised representations}
+Serdyuk \emph{et al.}~\cite{serdyuk2018e2eslu} demonstrated that intent can be predicted directly from audio without an intermediate transcript. Lugosch \emph{et al.}~\cite{lugosch2019fsc} released FSC together with a model whose lower layers are pre-trained to recognise phonemes and words; it reaches 98.8\% accuracy with the pre-trained layers frozen and 96.6\% when trained from random initialisation. Radfar \emph{et al.}~\cite{radfar2020transformer} reported 99.6\% intent accuracy with an end-to-end transformer. Self-supervised encoders learn speech representations from unlabelled audio~\cite{schneider2019wav2vec,baevski2020wav2vec2,hsu2021hubert}; wav2vec~2.0~\cite{baevski2020wav2vec2} masks latent speech features and solves a contrastive task over quantised targets. The SUPERB benchmark~\cite{yang2021superb} evaluates frozen encoders with lightweight downstream heads and reports FSC intent accuracies of 9.10\% for log mel filter-bank input, 92.35\% for wav2vec~2.0 Base and 98.34\% for HuBERT Base. Layer-wise probing~\cite{pasad2021layerwise} further shows that phonetic and word-level information in wav2vec~2.0 is not uniformly distributed across layers. Table~\ref{tab:lit} collects the published FSC results that are used for reference in Section~\ref{sec:results}.
+
+\begin{table}[t]
+\caption{Published intent accuracy on FSC (official test split)}
+\label{tab:lit}
+\centering
+\footnotesize
+\begin{tabular}{@{}llr@{}}
+\toprule
+Work & Model & Acc. (\%)\\
+\midrule
+SUPERB~\cite{yang2021superb} & Log mel filter bank, frozen & 9.10\\
+SUPERB~\cite{yang2021superb} & wav2vec 2.0 Base, frozen & 92.35\\
+SUPERB~\cite{yang2021superb} & HuBERT Base, frozen & 98.34\\
+Lugosch \emph{et al.}~\cite{lugosch2019fsc} & End-to-end, no pre-training & 96.6\\
+Lugosch \emph{et al.}~\cite{lugosch2019fsc} & ASR pre-trained, frozen & 98.8\\
+Radfar \emph{et al.}~\cite{radfar2020transformer} & End-to-end transformer & 99.6\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%=====================================================================
+\section{Research Gaps and Objectives}\label{sec:gaps}
+%=====================================================================
+The review above suggests the following gaps.
+\begin{enumerate}
+\item Work on FSC is dominated by pre-trained end-to-end models~\cite{lugosch2019fsc,radfar2020transformer,yang2021superb}; the accuracy attainable from classical, interpretable speech features on this corpus is seldom reported.
+\item The superiority of cepstral over prosodic or formant features is established for word recognition~\cite{davis1980mfcc}, but a controlled measurement of the gap with a fixed classifier on an intent task is not available.
+\item Classical sequence models (DTW, HMM)~\cite{sakoe1978dtw,rabiner1989hmm} and neural sequence models~\cite{abdelhamid2014cnn,sainath2015kws} are rarely compared on identical, non-pre-trained input features.
+\item The effect of the cepstral (DCT) step on a convolutional classifier has been examined for acoustic modelling~\cite{mohamed2012understanding} but not for utterance-level intent classification.
+\item Published FSC results use the official ten-speaker test split, and their sensitivity to speaker sampling is not reported.
+\end{enumerate}
+
+The objectives of the study are accordingly:
+\begin{enumerate}
+\item to implement and verify a classical short-time analysis front end and to measure the intent accuracy of prosodic and cepstral utterance statistics with SVM and MLP classifiers;
+\item to benchmark DTW and Gaussian HMM classifiers on MFCC sequences;
+\item to train convolutional sequence models from scratch on MFCC and log-mel inputs, including a multi-head variant aligned with the slot structure of the labels;
+\item to evaluate a frozen wav2vec~2.0 representation under pooled and sequence-level downstream classifiers;
+\item to repeat the evaluation on reduced-class slot tasks with 4, 6 and 14 classes; and
+\item to compare all models under a speaker-grouped cross-validation protocol and to analyse the residual errors.
+\end{enumerate}
+
+%=====================================================================
+\section{Dataset}\label{sec:data}
+%=====================================================================
+Fluent Speech Commands~\cite{lugosch2019fsc} contains 30,043 English utterances (19.0~h) recorded at 16~kHz by 97 speakers. Each utterance is annotated with three slots, \emph{action} (6 values), \emph{object} (14) and \emph{location} (4); their observed combinations form 31 intents, which are expressed through 248 distinct phrasings. The official partition is speaker-independent (Table~\ref{tab:data}), and the absence of speaker overlap between the three subsets was confirmed before any experiment. The corpus is distributed under a non-commercial licence for academic research.
+
+\begin{table}[t]
+\caption{Official FSC partition}
+\label{tab:data}
+\centering
+\footnotesize
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Subset & Utterances & Speakers\\
+\midrule
+Train & 23,132 & 77\\
+Validation & 3,118 & 10\\
+Test & 3,793 & 10\\
+\midrule
+Total & 30,043 & 97\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The intents are unevenly represented (Fig.~\ref{fig:intents}). The two volume commands account for 2,296 and 2,099 training utterances, whereas the least frequent intents have 342--401; a majority-class predictor therefore attains 10.4\% on the test subset. Utterances last 2.31~s on average, and 95\% are shorter than 3.41~s. Two properties of the corpus shape the analysis that follows. First, several intents differ only in the polarity of the action, and that polarity is often carried by a single short particle (\emph{``turn the lamp on''} versus \emph{``turn the lamp off''}, \emph{``volume up''} versus \emph{``volume down''}). Second, each of the official validation and test subsets contains only ten speakers.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_intent_dist.pdf}
+\caption{Number of training utterances per intent (action~\textbar~object~\textbar~location; the value \emph{none} is omitted).}
+\label{fig:intents}
+\end{figure}
+
+%=====================================================================
+\section{Methodology}\label{sec:method}
+%=====================================================================
+The overall procedure is shown in Fig.~\ref{fig:flow}. All tiers share the same input, label set and evaluation metric; they differ in the representation of the utterance and in the classifier placed on it.
+
+\begin{figure*}[t]
+\centering
+\resizebox{0.97\textwidth}{!}{\input{diagrams/methodology_flow.tex}}
+\caption{Methodology. The four tiers are ordered from classical to modern representations; each produces a 31-class intent decision that is evaluated under the protocol shown at the bottom.}
+\label{fig:flow}
+\end{figure*}
+
+\subsection{Pre-processing and short-time analysis}
+Each signal $x[n]$ is divided into frames of $N = 400$ samples (25~ms) with a hop of 160 samples (10~ms) and weighted by the Hamming window
+\begin{equation}
+w[n] = 0.54 - 0.46\cos\!\left(\frac{2\pi n}{N-1}\right), \quad 0 \le n \le N-1 .
+\end{equation}
+For frame $m$ with samples $x_m[n]$, the short-time energy and zero-crossing rate are
+\begin{align}
+E_m &= \sum_{n=0}^{N-1} x_m^2[n], \\
+Z_m &= \frac{1}{N-1}\sum_{n=1}^{N-1} \tfrac{1}{2}\left|\operatorname{sgn}(x_m[n]) - \operatorname{sgn}(x_m[n-1])\right| .
+\end{align}
+A frame is labelled as speech when $10\log_{10}E_m$ exceeds the 15th percentile of the utterance's frame energies by 10~dB. Speech frames whose $Z_m$ exceeds the 70th percentile of $Z$ over speech frames are labelled unvoiced and the remainder voiced. Both thresholds are thus relative to the recording itself, which is necessary because absolute levels vary with speaker, microphone and gain across the 97 speakers.
+
+For voiced frames the short-time autocorrelation $r_m[k] = \sum_{n} x_m[n]\,x_m[n+k]$ is computed and its maximum is sought over lags corresponding to 70--400~Hz. The fundamental frequency is $F_0 = f_s/k^{\ast}$, and the ratio $r_m[k^{\ast}]/r_m[0]$ is retained as a voicing confidence, with estimates below 0.3 treated as unreliable. Spectrograms are obtained as the squared magnitude of the short-time Fourier transform~\cite{allen1977stft}. Linear prediction models each sample as $\hat{x}[n] = -\sum_{k=1}^{p} a_k x[n-k]$; the coefficients of order $p = 16$ are obtained from the windowed-frame autocorrelation by the Levinson--Durbin recursion~\cite{makhoul1975lp}, formant candidates are taken as peaks of $1/|A(e^{j\omega})|$ below 3.5~kHz with a prominence of at least 0.3~dB, and the prediction residual $e[n] = x[n]-\hat{x}[n]$ approximates the excitation. MFCCs~\cite{davis1980mfcc} are computed from the same frames by a mel filter bank, a logarithm and a discrete cosine transform (DCT), retaining 13 coefficients.
+
+\subsection{Tier 1: utterance-level statistics}
+Each utterance is summarised by ten prosodic statistics: the mean and standard deviation of frame energy (dB), of zero-crossing rate and of $F_0$; the voiced-frame fraction; the mean first and second formant frequencies over voiced frames; and the duration. For processing the full corpus, $F_0$ is estimated with the YIN algorithm~\cite{decheveigne2002yin}, which follows the same periodicity principle as the autocorrelation method but is substantially faster. Appending the mean and standard deviation of each of the 13 MFCCs gives a 36-dimensional vector. Features are standardised with training-set statistics. An RBF-kernel SVM~\cite{cortes1995svm} is tuned over $C \in \{1, 10, 100\}$ and $\gamma \in \{\text{scale}, 0.01, 0.1\}$, and an MLP over hidden layers $\{(64), (128), (64, 32)\}$ and $L_2$ penalty $\alpha \in \{10^{-4}, 10^{-3}\}$, with selection on the official validation subset. Inverse-frequency class weighting is examined as an additional option. The selected configurations are subsequently re-evaluated, unchanged, under the cross-validation protocol of Section~\ref{sec:protocol}.
+
+\subsection{Tier 2: classical sequence models}
+MFCC sequences are padded or truncated to 350 frames (the 95th percentile of duration) for storage, and the padding is removed before sequence modelling so that each model sees the true utterance length. For DTW~\cite{sakoe1978dtw}, an approximate multiscale DTW with Euclidean local distance compares each query with five randomly drawn templates per intent (155 in total), and the label is assigned by a 3-nearest-neighbour vote. Because each comparison is costly, DTW is evaluated on 155 queries (five per intent) drawn from the held-out speakers of the first cross-validation fold. For the HMM~\cite{rabiner1989hmm}, one three-state Gaussian HMM with diagonal covariances is trained per intent with 20 Baum--Welch iterations, and a query is assigned to the intent whose model gives the highest log-likelihood.
+
+\subsection{Tier 3: convolutional sequence models}
+The convolutional network of Fig.~\ref{fig:cnn} operates along the time axis and treats feature dimensions as channels. It is trained from random initialisation with Adam~\cite{kingma2014adam}, sparse categorical cross-entropy, a batch size of 128 and at most 50 epochs, with early stopping (patience 8) on a validation group of speakers. Inputs are standardised per channel with training-fold statistics. Three variants are trained: (i) a single 31-way head on 13-dimensional MFCC sequences (115,871 parameters); (ii) a multi-head variant whose shared trunk feeds three softmax layers for action, object and location, trained with the sum of the three losses and with SpecAugment-style masking~\cite{park2019specaugment} of two 20-frame time blocks and two 3-coefficient blocks per sequence; and (iii) a single-head network on 40-band log-mel sequences computed with the same framing, which differ from MFCC only in omitting the DCT and the truncation that follows it. To separate these two operations, the orthonormal DCT-II is applied to the same 40-band log-mel frames and either all 40 coefficients (an invertible transform) or only the first 13 are retained. A multi-head prediction is counted as correct only when all three slots are correct.
+
+\begin{figure*}[t]
+\centering
+\resizebox{0.92\textwidth}{!}{\input{diagrams/cnn_architecture.tex}}
+\caption{One-dimensional convolutional network shared by Tiers 3 and 4. BN denotes batch normalisation.}
+\label{fig:cnn}
+\end{figure*}
+
+\subsection{Tier 4: frozen self-supervised representation}
+The wav2vec~2.0 Base encoder~\cite{baevski2020wav2vec2}, pre-trained without labels on 960~h of LibriSpeech~\cite{panayotov2015librispeech}, receives the raw waveform and produces a 768-dimensional vector every 20~ms from its final transformer layer. Its weights are never updated. Two downstream configurations are evaluated. In the pooled configuration, the frame vectors are averaged over time and classified by an RBF-kernel SVM ($C = 10$, $\gamma = $ scale, balanced class weights) and by an MLP with hidden layers (256, 128); these settings are fixed across folds. In the sequence configuration, frame vectors are projected to 128 dimensions by principal component analysis fitted on approximately 300,000 frames from 2,700 utterances of the official training subset (93.6\% of the variance retained), padded or truncated to 175 frames, and classified by the network of Fig.~\ref{fig:cnn}. The projection keeps the cached sequences of the full corpus within available memory.
+
+\subsection{Reduced-class tasks}\label{sec:slots}
+Because each intent is the combination of three slot values, three reduced-class tasks follow directly from the label structure: action (6 classes), object (14) and location (4). No intents are removed and no classes are hand-selected; each utterance is simply labelled with one slot value. The SVM and MLP of Tier~1, the log-mel CNN of Tier~3 and the wav2vec~2.0 sequence CNN of Tier~4 are retrained with a single softmax output for each task. The class distributions differ sharply between tasks (the value \emph{none} accounts for 61\% of locations), so the majority-class accuracy of each task is reported as its reference.
+
+\subsection{Evaluation protocol}\label{sec:protocol}
+Tier~1 models are reported on the official partition, for comparability with the corpus paper, and under cross-validation. For cross-validation, the 97 speakers are divided into five folds with grouped $K$-fold splitting on speaker identity, so that no speaker appears on both sides of a fold, and the same speaker folds are used for every model and task. Each fold holds out about 6,008 utterances from 19--20 speakers; for the networks, 10\% of the remaining speakers are set aside for early stopping. The primary metric is full-intent accuracy, reported as the mean $\pm$ sample standard deviation over folds. Because the folds are shared, models are also compared by their fold-wise paired differences with a paired $t$-test. Per-slot accuracy, confusion matrices and per-speaker accuracy are used for error analysis.
+
+The choice of protocol was motivated by a preliminary run of the single-head MFCC network on the official partition. It reached 84.4\% on the test subset while validation accuracy plateaued between 62\% and 67\%. Per-speaker inspection showed that three of the ten validation speakers were recognised at only 24.1\%, 34.9\% and 39.8\%, whereas every test speaker exceeded 69\%. With ten speakers per subset, a single-split figure therefore reflects the particular speakers drawn as much as the model, and speaker-grouped cross-validation over all 97 speakers was adopted for all models.
+
+%=====================================================================
+\section{Results and Discussion}\label{sec:results}
+%=====================================================================
+\subsection{Short-time analysis of a single utterance}
+The front end was first examined on the utterance \emph{``Bring socks''} (1.76~s). The energy--ZCR labelling yields 75 voiced, 30 unvoiced and 69 silent frames (Fig.~\ref{fig:vus}). The two /s/ fricatives appear as intervals of low energy and high ZCR (0.15--0.21), consistent with turbulent excitation. The /k/ closure near 1.3~s is labelled partly as silence, because the burst is shorter than one analysis frame and a 25~ms frame mixes closure, burst and voicing. A first labelling with a threshold relative to the maximum energy classified no frame as unvoiced, since this speaker's fricatives lie close to the noise floor; anchoring the threshold to the utterance's own floor resolved this.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.80\textwidth]{fig_vus.pdf}\\[2pt]
+\includegraphics[width=0.80\textwidth]{fig_pitch.pdf}
+\caption{Short-time analysis of \emph{``Bring socks''}. Top: waveform, short-time energy, zero-crossing rate and the resulting voiced/unvoiced/silence labels. Bottom: (a) normalised autocorrelation of a voiced frame with the 70--400~Hz search range shaded; (b) frame-wise $F_0$ contour.}
+\label{fig:vus}
+\end{figure*}
+
+Autocorrelation pitch analysis (Fig.~\ref{fig:vus}, bottom) gives an $F_0$ estimate for all 75 voiced frames, 63 of which exceed the confidence threshold. For the frame at 0.752~s the autocorrelation peaks at a lag of 52 samples ($F_0 = 307.7$~Hz), with further peaks at integer multiples of this lag. The contour rises from about 210 to 310~Hz over \emph{``bring''} and falls from about 258 to 195~Hz over \emph{``socks''}. One estimate at 0.463~s (98.2~Hz, confidence 0.458) lies near half the value of its neighbours and is an octave error that passes the confidence test, illustrating that range restriction and confidence filtering reduce but do not remove such errors~\cite{rabiner1977pitch}.
+
+
+
+The spectrogram (Fig.~\ref{fig:spec}) provides an independent check of these measurements. The harmonic spacing during \emph{``bring''} is roughly 250--300~Hz, in agreement with the autocorrelation estimate; the fricatives show diffuse energy without harmonic structure; and the /k/ release appears as a brief broadband vertical stripe. The narrowband (40~ms) analysis resolves individual harmonics, whereas the wideband (5~ms) analysis exposes individual glottal pulses at the cost of frequency detail. The order-16 linear-prediction envelope of the 0.752~s frame (Fig.~\ref{fig:spec}, bottom) resolves two resonances at 305 and 656~Hz. An independent envelope computed with Burg's method placed both peaks at the same frequencies. The 305~Hz peak lies close to the measured $F_0$ of the frame; it is plausible as the first formant of the close front vowel in \emph{``bring''}, but a contribution from a strong low harmonic at this high $F_0$ cannot be excluded from a single frame. The normalised autocorrelation of the residual at the pitch lag decreases from 0.406 at $p = 8$ to 0.346 at $p = 20$, showing that higher prediction orders absorb part of the source periodicity into the all-pole filter.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.80\textwidth]{fig_spectrogram.pdf}\\[2pt]
+\includegraphics[width=0.80\textwidth]{fig_lpc.pdf}
+\caption{Spectral analysis of \emph{``Bring socks''}. Top: (a) 25~ms Hamming spectrogram of the full utterance; (b) narrowband and (c) wideband analysis of \emph{``bring''}. Bottom: (a) order-16 linear-prediction envelope over the spectrum of the frame at 0.752~s; (b) prediction residual, with dotted lines at multiples of the measured pitch period.}
+\label{fig:spec}
+\end{figure*}
+
+
+
+\subsection{Tier 1: utterance-level statistics}
+Table~\ref{tab:tier1} reports the utterance-level classifiers. With prosodic statistics alone, the tuned SVM reaches 16.5\% on the test subset, 6.1 points above the majority baseline. Accuracy plateaued near 15--16\% across the hyperparameter grid for both classifiers, which indicates that the limitation lies in the features rather than in the classifier. The confusion matrix (Fig.~\ref{fig:cm1}) shows two systematic effects. The most frequent intents absorb many predictions: \emph{increase volume} accounts for 20.3\% of SVM predictions against 10.4\% of test labels. The best-recognised intent, \emph{change language Chinese} (52.0\% recall), is distinguished chiefly by duration, since its phrasings average 3.06~s against a training mean of 2.29~s. Eight intents are recognised at or below 1\%. Inverse-frequency class weighting raised test macro-F1 of the SVM only from 0.115 to 0.120 while reducing accuracy to 12.2\%, and it was not retained.
+
+\begin{table}[t]
+\caption{Utterance-level classifiers, 31-class accuracy (\%): official partition and 5-fold speaker-grouped CV}
+\label{tab:tier1}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Features & Classifier & Valid. & Test & CV\\
+\midrule
+-- & Majority class & 10.2 & 10.4 & $10.0 \pm 0.2$\\
+Prosodic & SVM ($C{=}10$, $\gamma{=}0.01$) & 16.4 & 16.5 & $17.8 \pm 1.0$\\
+Prosodic & MLP (64) & 15.2 & 14.3 & $16.5 \pm 1.5$\\
++ MFCC & SVM ($C{=}1$, $\gamma{=}0.01$) & 22.3 & \textbf{25.8} & $\mathbf{24.0 \pm 1.0}$\\
++ MFCC & MLP (64, 32) & 22.4 & 21.0 & $21.4 \pm 1.0$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_cm_svm_mfcc.pdf}
+\caption{Row-normalised confusion matrix of the SVM on prosodic and MFCC statistics (official test subset, 25.8\% accuracy).}
+\label{fig:cm1}
+\end{figure}
+
+Adding MFCC statistics raises the SVM to 25.8\% (+9.3 points) and the MLP to 21.0\% (+6.6 points). Under speaker-grouped cross-validation the same configurations give $17.8 \pm 1.0\%$ and $24.0 \pm 1.0\%$ for the SVM, and the MFCC statistics improve every fold (mean paired difference 6.2 points, $p < 0.001$); the conclusions drawn from the official partition therefore hold under the stricter protocol. This gain exceeds every improvement obtained by tuning the prosodic system and is consistent with the distinction between the two feature families. Energy, ZCR, pitch, two formants and duration describe how an utterance is spoken; the cepstral envelope carries information about which phones occur, and the intent is determined by the latter. Averaging over the utterance nevertheless removes the order in which the phones occur, which bounds what any static vector can achieve.
+
+\subsection{Tier 2: classical sequence models}
+The DTW 3-NN classifier reaches 11.6\% on its 155-query subset, and the per-class Gaussian HMM reaches $6.0 \pm 0.7\%$ over the five folds, both near or below the majority baseline. When the HMMs were trained and scored on the zero-padded sequences, accuracy was $9.8\%$; the drop after padding removal shows that the padded version partly exploited the amount of padding, a duration cue correlated with intent, rather than spectral structure. Inspection of the trimmed scores showed finite, well-separated log-likelihoods, with a small number of class models winning a disproportionate share of queries. These baselines are deliberately minimal (three ergodic states, one Gaussian per state, no dynamic features and five DTW templates per class), and the comparison should be read as showing that such configurations are far from adequate for 31 multi-word intents with 248 phrasings, not that classical sequence modelling is inherently unsuited to the task.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.80\textwidth]{fig_overall.pdf}\\[2pt]
+\includegraphics[width=0.80\textwidth]{fig_folds.pdf}
+\caption{Top: intent accuracy of all configurations under 5-fold speaker-grouped cross-validation, ordered from classical to modern; error bars denote the standard deviation over folds ($^{\dagger}$DTW is evaluated on a 155-query subset of one fold). Bottom: held-out accuracy of each model per fold, with horizontal bars at the fold mean.}
+\label{fig:overall}
+\end{figure*}
+
+\subsection{Tier 3: convolutional sequence models}
+Table~\ref{tab:cv} and Fig.~\ref{fig:overall} summarise the cross-validated sequence models. The single-head CNN on MFCC sequences reaches $72.5 \pm 5.0\%$, almost three times the static MFCC result, which identifies temporal order as the dominant missing factor in Tier~1. The multi-head variant improves on it in every fold (mean paired difference 4.8 points, $p = 0.007$) and reaches $77.3 \pm 6.7\%$. Its per-slot accuracies are $85.3\%$ (action), $91.7\%$ (object) and $94.1\%$ (location) (Fig.~\ref{fig:slots}); the action slot is the weakest. Since this variant also introduces SpecAugment masking, the gain reflects the combination of the factorised output and augmentation.
+
+\begin{table}[t]
+\caption{Speaker-grouped five-fold cross-validation (full-intent accuracy, \%)}
+\label{tab:cv}
+\centering
+\footnotesize
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Model & Mean $\pm$ s.d. & Range\\
+\midrule
+Gaussian HMM, MFCC & $6.0 \pm 0.7$ & 5.3--7.1\\
+1D-CNN, MFCC & $72.5 \pm 5.0$ & 65.4--77.6\\
+Multi-head 1D-CNN, MFCC & $77.3 \pm 6.7$ & 67.6--83.3\\
+1D-CNN, log-mel & $79.4 \pm 6.8$ & 70.9--88.5\\
+wav2vec 2.0 pooled + SVM & $59.9 \pm 4.4$ & 55.8--67.5\\
+wav2vec 2.0 pooled + MLP & $69.9 \pm 4.7$ & 66.3--78.0\\
+wav2vec 2.0 sequence + 1D-CNN & $\mathbf{93.1 \pm 3.1}$ & 88.9--96.9\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\columnwidth]{fig_multihead_slots.pdf}
+\caption{Per-slot and full-intent accuracy of the multi-head CNN (mean $\pm$ s.d. over folds; number of classes in parentheses).}
+\label{fig:slots}
+\end{figure}
+
+Replacing MFCC with 40-band log-mel input under the identical single-head network raises accuracy to $79.4 \pm 6.8\%$, an improvement in every fold (mean 6.9 points, $p = 0.005$). The two representations share the mel filter bank and the logarithm; MFCC adds a DCT and truncation to 13 coefficients, and the log-mel input is also wider (40 against 13 dimensions). Table~\ref{tab:dct} separates these factors by applying the DCT to the same log-mel frames. Retaining all 40 DCT coefficients, which preserves every dimension and is exactly invertible, lowers accuracy to $63.5 \pm 5.0\%$, 15.9 points below log-mel in every fold ($p < 0.001$). Truncating the same transform to 13 coefficients recovers $73.1 \pm 5.8\%$, which is indistinguishable from the original MFCC computed from 128 mel bands ($p = 0.60$). The advantage of log-mel input is therefore due to the absence of the DCT, not to its additional dimensions, and the size of the mel filter bank has no measurable effect.
+
+\begin{table}[t]
+\caption{Effect of the cepstral DCT on the 1D-CNN (31-class accuracy, \%, 5-fold speaker-grouped CV)}
+\label{tab:dct}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcr@{}}
+\toprule
+Input (per frame) & Dim. & Mean $\pm$ s.d.\\
+\midrule
+40-band log-mel & 40 & $\mathbf{79.4 \pm 6.8}$\\
+DCT of log-mel, first 13 coefficients & 13 & $73.1 \pm 5.8$\\
+MFCC (128 mel bands), 13 coefficients & 13 & $72.5 \pm 5.0$\\
+DCT of log-mel, all 40 coefficients & 40 & $63.5 \pm 5.0$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Since an invertible linear map could in principle be absorbed by the first convolutional layer, the loss must arise from how the transformed input is presented to the network. Each input channel is standardised to unit variance before training. Across the log-mel bands the standard deviations differ by a factor of 1.9, whereas across the DCT coefficients they differ by a factor of 60, and coefficients 14--40 carry only 2.2\% of the total variance. Standardisation thus gives these low-variance, high-quefrency coefficients, which mainly describe fine spectral detail and noise, the same weight as the coefficients that describe the spectral envelope. Truncation removes most of them, which explains why 13 coefficients outperform 40. The DCT remains appropriate for diagonal-covariance Gaussian models, which benefit from decorrelated inputs, but for this convolutional classifier the log-mel representation is preferable, in agreement with Mohamed \emph{et al.}~\cite{mohamed2012understanding}. The log-mel network also exceeds the multi-head MFCC network by 2.1 points on average, but this difference is not consistent across folds ($p = 0.16$).
+
+
+
+\subsection{Tier 4: frozen wav2vec 2.0 representation}
+With mean pooling, the frozen wav2vec~2.0 representation gives $59.9 \pm 4.4\%$ with the SVM and $69.9 \pm 4.7\%$ with the MLP. These figures are far above the static MFCC statistics of Tier~1, yet the pooled MLP does not differ significantly from the from-scratch MFCC CNN (mean paired difference $-2.6$ points, $p = 0.24$). The pooled setting discards temporal order in the same way as the Tier~1 statistics. When the frame sequence is retained and classified by the network of Fig.~\ref{fig:cnn}, accuracy rises to $93.1 \pm 3.1\%$, exceeding the log-mel CNN in every fold (mean paired difference 13.7 points, $p = 0.001$) and showing the lowest fold-to-fold spread of all models. The pooled and sequence results therefore separate two effects: the pre-trained representation is the stronger feature when temporal modelling is held constant, and temporal modelling remains necessary to exploit it.
+
+The cross-validated accuracy of the frozen encoder is close to the 92.35\% reported by SUPERB for frozen wav2vec~2.0 Base on the official test split~\cite{yang2021superb}, although the protocols differ. It remains below the 98.8\% of the ASR-pre-trained model of Lugosch \emph{et al.}~\cite{lugosch2019fsc} and the 98.34\% of frozen HuBERT Base~\cite{yang2021superb}. The present configuration uses only the final transformer layer, whose phonetic content is known to be lower than that of intermediate layers~\cite{pasad2021layerwise}, and a PCA projection that discards 6.4\% of the variance; both are likely contributors to this gap.
+
+\subsection{Reduced-class slot tasks}
+Table~\ref{tab:slots} and Fig.~\ref{fig:slottasks} report the three slot tasks of Section~\ref{sec:slots} alongside the 31-class task, on the same speaker folds. Reducing the number of classes raises accuracy for every model. For the SVM on prosodic and MFCC statistics, accuracy rises from 24.0\% on the intent to 40.7\% on the action, 49.3\% on the object and 64.3\% on the location. These gains, however, largely follow the rise of the majority-class baseline, from 10.0\% to 25.8\%, 31.2\% and 61.2\%. Expressed as the fraction of the majority-class error that a model removes, $(a - a_{\mathrm{maj}})/(100 - a_{\mathrm{maj}})$, the SVM removes 15.6\% of this error on the intent, 20.1\% on the action, 26.3\% on the object and only 8.0\% on the location, where the MLP falls below the baseline (60.5\% against 61.2\%). The location is unspoken in most utterances and, when present, is a single word near the end of the command, a cue that utterance-level averages capture poorly.
+
+\begin{table}[t]
+\caption{Reduced-class slot tasks: mean accuracy (\%) over five speaker-grouped folds (number of classes in parentheses)}
+\label{tab:slots}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Model & Loc.\ (4) & Act.\ (6) & Obj.\ (14) & Intent (31)\\
+\midrule
+Majority class & 61.2 & 25.8 & 31.2 & 10.0\\
+Prosodic + SVM & 62.6 & 35.8 & 42.9 & 17.8\\
+Prosodic + MFCC + SVM & 64.3 & 40.7 & 49.3 & 24.0\\
+Prosodic + MFCC + MLP & 60.5 & 34.3 & 42.4 & 21.4\\
+1D-CNN, log-mel & 90.6 & 85.1 & 89.1 & 79.4\\
+wav2vec 2.0 + 1D-CNN & \textbf{97.5} & \textbf{95.1} & \textbf{96.4} & \textbf{93.1}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.80\textwidth]{fig_slot_tasks.pdf}
+\caption{Accuracy on the three reduced-class slot tasks and on the 31-class intent task (mean $\pm$ s.d. over five speaker-grouped folds).}
+\label{fig:slottasks}
+\end{figure*}
+
+The sequence models behave differently. The log-mel CNN reaches 85.1--90.6\% on the slot tasks and the wav2vec~2.0 network 95.1--97.5\%, removing 76--84\% and 92--95\% of the majority-class error respectively, with little variation between tasks. A smaller label set therefore improves the headline accuracy of the classical pipeline without changing its position relative to the other tiers: the limiting factor is the loss of temporal information in the utterance-level representation rather than the number of classes. The single-slot log-mel networks also do not exceed the corresponding heads of the multi-head MFCC network (85.1, 89.1 and 90.6\% against 85.3, 91.7 and 94.1\% for action, object and location), which suggests that joint training across slots, together with augmentation, benefits the individual slots.
+
+\subsection{Error analysis of the strongest model}
+To inspect individual errors, the sequence wav2vec~2.0 model was retrained on the first fold with predictions retained (91.7\% accuracy, against 91.4\% in the original run). The confusion matrix (Fig.~\ref{fig:cmw}) is strongly diagonal, and the errors that remain are concentrated on pairs of opposite polarity. \emph{Increase volume} is predicted as \emph{decrease volume} 40 times, \emph{increase heat} is predicted as \emph{decrease heat} in each location (8--14 times per location), and confusions of the same kind occur for music and lamp commands. Slot accuracy is correspondingly lowest for the action (93.9\%), compared with 95.2\% for the object and 97.2\% for the location. In these phrasings the polarity is often carried by one short, unstressed particle (\emph{up}/\emph{down}, \emph{on}/\emph{off}) while the rest of the utterance is shared, so a small acoustic cue decides the label. Accuracy also varies widely across the 19 held-out speakers: 14 exceed 89\%, while two are recognised at 36.4\% and 44.2\%. Speaker variability of this kind explains the fold-to-fold spread in Table~\ref{tab:cv} and the instability of the ten-speaker official split.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_cm_w2v.pdf}
+\caption{Row-normalised confusion matrix of the wav2vec~2.0 sequence model on the held-out speakers of fold 1 (91.7\% accuracy).}
+\label{fig:cmw}
+\end{figure}
+
+\subsection{Overall comparison}
+Fig.~\ref{fig:overall} places all configurations on a common axis in classical-to-modern order. Three steps account for most of the progression: adding cepstral content to utterance statistics (17.8 to 24.0\%), retaining temporal order with a convolutional network (24.0 to 72.5--79.4\%), and replacing hand-crafted frame features with a frozen self-supervised representation (79.4 to 93.1\%). All figures except DTW share the same speaker folds; the DTW figure rests on a 155-query subset of one fold. In addition, the PCA used in Tier~4 was fitted on utterances from the official training speakers, some of whom fall in held-out folds; the projection is unsupervised and generic, so the effect is expected to be small, but it is not strictly fold-internal.
+
+
+
+%=====================================================================
+\section{Conclusion}\label{sec:conclusion}
+%=====================================================================
+This study examined spoken intent classification on Fluent Speech Commands through a sequence of representations ordered from classical short-time analysis to a frozen self-supervised encoder. The classical front end behaved as expected on individual utterances, and its pitch, spectral and linear-prediction measurements agreed with one another. Prosodic utterance statistics, however, carry little of the information that distinguishes intents ($17.8\%$ under cross-validation), and cepstral statistics recover only part of it ($24.0\%$). Minimal DTW and HMM baselines did not exceed the majority class. Convolutional networks trained from scratch on frame sequences raise accuracy to 72.5--79.4\%, with log-mel input outperforming MFCC in every fold because the cepstral DCT, combined with per-channel standardisation, inflates low-variance coefficients; the same network on frozen wav2vec~2.0 frames reaches 93.1\%. Across the progression, preserving temporal order produced the largest single gain, and the pre-trained representation produced the second. Reducing the task to the action, object or location slot raised accuracy for every model, but the utterance-level statistics removed at most a quarter of the majority-class error on any slot, whereas the sequence models removed 76--95\%; the number of classes is therefore not the main source of difficulty for the classical pipeline. The remaining errors of the strongest model fall mainly on commands of opposite polarity and on a few difficult speakers. The evaluation also showed that the ten-speaker official subsets of FSC are too small for stable single-split estimates, and that speaker-grouped cross-validation with paired comparisons gives a more reliable basis for comparing models on this corpus.
+
+Several extensions follow from these observations. Classical sequence baselines with left-to-right topology, Gaussian mixtures and dynamic features~\cite{furui1986delta} would give a fairer classical reference. On the self-supervised side, a learned weighting of encoder layers~\cite{yang2021superb}, comparison with HuBERT~\cite{hsu2021hubert}, and fine-tuning of the encoder are the natural next steps, together with evaluation under additive noise and on unseen phrasings.
+
+\section*{Acknowledgment}
+The authors thank Dr.~Jyothish Lal for guidance throughout the course project.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
