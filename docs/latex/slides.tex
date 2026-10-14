@@ -217,7 +217,7 @@
 %======================================================================
 \begin{frame}{Objectives}
 \begin{itemize}\setlength{\itemsep}{6pt}
-\item Implement and verify a classical short-time analysis front end
+\item Implement and verify a classical feature-extraction pipeline
 \item Measure intent accuracy of prosodic vs.\ cepstral utterance statistics
 \item Benchmark DTW and Gaussian HMM classifiers on MFCC sequences
 \item Train 1D-CNNs from scratch on MFCC and log-mel sequences
@@ -264,7 +264,7 @@
 \end{frame}
 
 %======================================================================
-\begin{frame}{Methodology: Classical Front End}
+\begin{frame}{Methodology: Classical Feature Extraction}
 \begin{itemize}\setlength{\itemsep}{5pt}
 \item Framing: 25 ms frames (400 samples), 10 ms hop, Hamming window
 \item Short-time energy $E_m = \sum_n x_m^2[n]$; ZCR = fraction of sign changes per frame
